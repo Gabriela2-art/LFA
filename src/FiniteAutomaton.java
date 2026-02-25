@@ -1,13 +1,15 @@
 import java.util.*;
 
 public class FiniteAutomaton {
-    private Set<String> Q; 
-    private Set<String> Sigma; 
-    private Map<String, Map<String, String>> delta; 
-    private String q0; 
-    private Set<String> F; 
+    private Set<String> Q; // states
+    private Set<String> Sigma; // alphabet
+    private Map<String, Map<String, Set<String>>> delta; // transitions
+    private String q0; // start state
+    private Set<String> F; // final states
 
-    public FiniteAutomaton(Set<String> Q, Set<String> Sigma, Map<String, Map<String, String>> delta, String q0, Set<String> F) {
+    public FiniteAutomaton(Set<String> Q, Set<String> Sigma,
+                           Map<String, Map<String, Set<String>>> delta,
+                           String q0, Set<String> F) {
         this.Q = Q;
         this.Sigma = Sigma;
         this.delta = delta;
@@ -15,48 +17,162 @@ public class FiniteAutomaton {
         this.F = F;
     }
 
-    public boolean stringBelongToLanguage(String input) {
-        String currentState = q0;
+    public Set<String> getQ() { return Q; }
+    public Set<String> getSigma() { return Sigma; }
+    public String getQ0() { return q0; }
+    public Set<String> getF() { return F; }
 
-        for (int i = 0; i < input.length(); i++) {
-            String symbol = String.valueOf(input.charAt(i));
-            if (!delta.containsKey(currentState)) return false;
-            if (!delta.get(currentState).containsKey(symbol)) return false;
-
-            currentState = delta.get(currentState).get(symbol);
-        }
-
-        return F.contains(currentState);
-    }
-
-    public static FiniteAutomaton fromGrammar(Grammar g) {
-        Set<String> Q = new HashSet<>(g.getVN());
-        String finalState = "FINAL";
-        Q.add(finalState);
-
-        Set<String> Sigma = new HashSet<>(g.getVT());
-        Map<String, Map<String, String>> delta = new HashMap<>();
-
-        Set<String> F = new HashSet<>();
-        F.add(finalState);
-
+    // Check if FA is deterministic
+    public boolean isDeterministic() {
         for (String state : Q) {
-            delta.put(state, new HashMap<>());
-        }
-
-        for (Map.Entry<String, List<String>> entry : g.getP().entrySet()) {
-            String left = entry.getKey();
-            for (String right : entry.getValue()) {
-                if (right.length() == 1) {
-                    String terminal = right;
-                    delta.get(left).put(terminal, finalState);
-                } else if (right.length() == 2) {
-                    String terminal = String.valueOf(right.charAt(0));
-                    String nextState = String.valueOf(right.charAt(1));
-                    delta.get(left).put(terminal, nextState);
+            Map<String, Set<String>> trans = delta.get(state);
+            if (trans == null) continue;
+            for (String sym : trans.keySet()) {
+                if (trans.get(sym).size() > 1) {
+                    return false; // more than one destination
                 }
             }
         }
-        return new FiniteAutomaton(Q, Sigma, delta, g.getS(), F);
+        return true;
+    }
+
+    // Check if a string is accepted (works for DFA or simple NDFA via BFS)
+    public boolean stringBelongToLanguage(String w) {
+        Set<String> current = new HashSet<>();
+        current.add(q0);
+
+        for (int i = 0; i < w.length(); i++) {
+            String sym = String.valueOf(w.charAt(i));
+            Set<String> next = new HashSet<>();
+            for (String st : current) {
+                if (delta.containsKey(st) && delta.get(st).containsKey(sym)) {
+                    next.addAll(delta.get(st).get(sym));
+                }
+            }
+            current = next;
+            if (current.isEmpty()) return false;
+        }
+
+        for (String st : current) {
+            if (F.contains(st)) return true;
+        }
+        return false;
+    }
+
+    // Convert FA to Regular Grammar
+    public Grammar toRegularGrammar() {
+        Set<String> VN = new HashSet<>(Q);
+        Set<String> VT = new HashSet<>(Sigma);
+        Map<String, List<String>> P = new HashMap<>();
+
+        for (String q : Q) {
+            P.putIfAbsent(q, new ArrayList<>());
+            if (delta.containsKey(q)) {
+                for (String a : delta.get(q).keySet()) {
+                    for (String q2 : delta.get(q).get(a)) {
+                        // q -> a q2
+                        P.get(q).add(a + q2);
+                        // if q2 is final, also add q -> a
+                        if (F.contains(q2)) {
+                            P.get(q).add(a);
+                        }
+                    }
+                }
+            }
+        }
+
+        return new Grammar(VN, VT, P, q0);
+    }
+
+    // Convert NDFA to DFA (subset construction)
+    public FiniteAutomaton toDFA() {
+        Set<Set<String>> dfaStates = new HashSet<>();
+        Map<Set<String>, Map<String, Set<String>>> dfaDelta = new HashMap<>();
+        Queue<Set<String>> queue = new LinkedList<>();
+
+        Set<String> start = new HashSet<>();
+        start.add(q0);
+
+        queue.add(start);
+        dfaStates.add(start);
+
+        while (!queue.isEmpty()) {
+            Set<String> current = queue.poll();
+            dfaDelta.putIfAbsent(current, new HashMap<>());
+
+            for (String sym : Sigma) {
+                Set<String> next = new HashSet<>();
+                for (String st : current) {
+                    if (delta.containsKey(st) && delta.get(st).containsKey(sym)) {
+                        next.addAll(delta.get(st).get(sym));
+                    }
+                }
+
+                if (!next.isEmpty()) {
+                    dfaDelta.get(current).put(sym, next);
+                    if (!dfaStates.contains(next)) {
+                        dfaStates.add(next);
+                        queue.add(next);
+                    }
+                }
+            }
+        }
+
+        // Build DFA components
+        Set<String> newQ = new HashSet<>();
+        Map<String, Map<String, Set<String>>> newDelta = new HashMap<>();
+        Set<String> newF = new HashSet<>();
+
+        // Map set-states to names
+        Map<Set<String>, String> nameMap = new HashMap<>();
+        int idx = 0;
+        for (Set<String> s : dfaStates) {
+            String name = "D" + idx++;
+            nameMap.put(s, name);
+            newQ.add(name);
+        }
+
+        for (Set<String> s : dfaStates) {
+            String fromName = nameMap.get(s);
+            newDelta.putIfAbsent(fromName, new HashMap<>());
+
+            // final if contains any old final
+            for (String f : F) {
+                if (s.contains(f)) {
+                    newF.add(fromName);
+                    break;
+                }
+            }
+
+            Map<String, Set<String>> trans = dfaDelta.get(s);
+            if (trans != null) {
+                for (String sym : trans.keySet()) {
+                    Set<String> toSet = trans.get(sym);
+                    String toName = nameMap.get(toSet);
+                    newDelta.get(fromName).put(sym, new HashSet<>(Arrays.asList(toName)));
+                }
+            }
+        }
+
+        String newStart = nameMap.get(start);
+
+        return new FiniteAutomaton(newQ, Sigma, newDelta, newStart, newF);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("States: ").append(Q).append("\n");
+        sb.append("Alphabet: ").append(Sigma).append("\n");
+        sb.append("Start: ").append(q0).append("\n");
+        sb.append("Final: ").append(F).append("\n");
+        sb.append("Transitions:\n");
+        for (String s : delta.keySet()) {
+            for (String a : delta.get(s).keySet()) {
+                sb.append("  ").append(s).append(" --").append(a).append("--> ")
+                  .append(delta.get(s).get(a)).append("\n");
+            }
+        }
+        return sb.toString();
     }
 }
