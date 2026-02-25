@@ -40,7 +40,7 @@ The implementation is organized into three main classes: FiniteAutomaton, Gramma
 The FiniteAutomaton class models both deterministic and non-deterministic finite automata by storing the set of states, the alphabet, the transition function, the initial state, and the set of final states. The transition function is implemented using a map that allows multiple destination states for the same state and symbol, which makes it suitable for representing an NDFA. This class also contains the logic for checking determinism, converting an NDFA to a DFA, converting an automaton to a regular grammar, and testing whether a string is accepted by the automaton.
 Example: checking if the automaton is deterministic
 
-```
+```java
 public boolean isDeterministic() {
     for (String state : Q) {
         Map<String, Set<String>> trans = delta.get(state);
@@ -63,7 +63,7 @@ This method iterates through all states and symbols and verifies that each trans
 The conversion from NDFA to DFA is implemented using the subset construction algorithm. In this approach, each state of the DFA represents a set of states of the original NDFA, and new states are generated iteratively by following transitions for each input symbol. The resulting automaton is guaranteed to be deterministic and equivalent to the original NDFA.
 Example: creating new DFA states using subset construction
 
-```
+```java
 Set<String> start = new HashSet<>();
 start.add(q0);
 
@@ -79,7 +79,7 @@ The algorithm starts from the initial state set and uses a queue to explore and 
 The method toRegularGrammar() implements the standard transformation from a finite automaton to a regular grammar. For each transition of the form qi --a--> qj, a production rule Qi → aQj is created, and if qj is a final state, an additional production Qi → a is added. In this way, the obtained grammar generates the same language as the automaton.
 Example: building productions from transitions
 
-```
+```java
 for (String q : Q) {
     P.putIfAbsent(q, new ArrayList<>());
     if (delta.containsKey(q)) {
@@ -101,7 +101,7 @@ for (String q : Q) {
 The Grammar class stores the set of non-terminals, the set of terminals, the start symbol, and the production rules. It also provides a method for classifying the grammar according to the Chomsky hierarchy by checking whether all productions have the form of a regular grammar. Additionally, a simple string generation method is included to demonstrate derivations from the grammar.
 Example: Chomsky classification
 
-```
+```java
 public String classifyChomsky() {
     boolean isRegular = true;
 
@@ -132,7 +132,7 @@ This method analyzes the right-hand side of each production and determines wheth
 The Main class is used to demonstrate the functionality of the project. It constructs the finite automaton corresponding to the given variant, checks whether it is deterministic, converts it to a DFA, converts the automaton to a regular grammar, and classifies the grammar according to the Chomsky hierarchy. Finally, it tests several input strings on the obtained DFA to validate the correctness of the implementation.
 Example: main method
 
-```
+```java
 public static void main(String[] args) {
     FiniteAutomaton ndfa = new FiniteAutomaton(Q, Sigma, delta, "q0", F);
 
@@ -175,3 +175,4 @@ The experimental results, including the determinism check and the testing of sev
 3. Pitts M. Andrew. Regular Languages and Finite Automata
 
 4. Compilers: Principles, Techniques, and Tools (2nd edition). Alfred V. Aho, Monica S. Lam, Ravi Sethi and Jeff Ullman. Publisher: Addison Wesley, 2007
+
