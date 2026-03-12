@@ -9,7 +9,6 @@ public class Main {
 
         Map<String, Map<String, Set<String>>> delta = new HashMap<>();
 
-        // helper
         addTransition(delta, "q0", "a", "q0");
         addTransition(delta, "q0", "a", "q1");
         addTransition(delta, "q1", "c", "q1");
@@ -23,19 +22,16 @@ public class Main {
         System.out.println(ndfa);
         System.out.println("Is deterministic? " + ndfa.isDeterministic());
 
-        // Convert to DFA
         FiniteAutomaton dfa = ndfa.toDFA();
         System.out.println("\n=== Converted DFA ===");
         System.out.println(dfa);
         System.out.println("Is deterministic? " + dfa.isDeterministic());
 
-        // Convert FA to Grammar
         Grammar g = ndfa.toRegularGrammar();
         System.out.println("\n=== Regular Grammar from FA ===");
         System.out.println(g);
         System.out.println("Chomsky classification: " + g.classifyChomsky());
 
-        // Test some strings on DFA
         System.out.println("\n=== Testing strings on DFA ===");
         String[] tests = {"a", "ab", "acb", "b", "aacb"};
         for (String t : tests) {

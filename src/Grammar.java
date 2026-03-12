@@ -1,10 +1,10 @@
 import java.util.*;
 
 public class Grammar {
-    private Set<String> VN; // Non-terminals
-    private Set<String> VT; // Terminals
-    private Map<String, List<String>> P; // Productions
-    private String S; // Start symbol
+    private Set<String> VN; 
+    private Set<String> VT; 
+    private Map<String, List<String>> P; 
+    private String S; 
 
     public Grammar(Set<String> VN, Set<String> VT, Map<String, List<String>> P, String S) {
         this.VN = VN;
@@ -18,7 +18,6 @@ public class Grammar {
     public Map<String, List<String>> getP() { return P; }
     public String getS() { return S; }
 
-    // Generate a random string (simple derivation)
     public String generateString() {
         Random rnd = new Random();
         String current = S;
@@ -38,23 +37,19 @@ public class Grammar {
             if (!replaced) break;
         }
 
-        // remove non-terminals if any left
         for (String nt : VN) {
             current = current.replace(nt, "");
         }
         return current;
     }
 
-    // Classify grammar in Chomsky hierarchy (simplified)
     public String classifyChomsky() {
-        // We assume productions are of form A -> aB or A -> a or A -> ε
         boolean isRegular = true;
 
         for (Map.Entry<String, List<String>> e : P.entrySet()) {
             for (String rhs : e.getValue()) {
-                if (rhs.length() == 0) continue; // epsilon
+                if (rhs.length() == 0) continue; 
                 if (rhs.length() == 1) {
-                    // must be terminal
                     if (!VT.contains(rhs)) {
                         isRegular = false;
                     }
