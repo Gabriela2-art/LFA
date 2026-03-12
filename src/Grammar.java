@@ -48,23 +48,25 @@ public class Grammar {
 
         for (Map.Entry<String, List<String>> e : P.entrySet()) {
             for (String rhs : e.getValue()) {
+
                 if (rhs.length() == 0) continue; 
+                String first = String.valueOf(rhs.charAt(0));
+
+                if (!VT.contains(first)) {
+                    isRegular = false;
+                    continue;
+                }
+
                 if (rhs.length() == 1) {
-                    if (!VT.contains(rhs)) {
-                        isRegular = false;
-                    }
-                } else if (rhs.length() == 2) {
-                    String a = String.valueOf(rhs.charAt(0));
-                    String B = String.valueOf(rhs.charAt(1));
-                    if (!VT.contains(a) || !VN.contains(B)) {
-                        isRegular = false;
-                    }
-                } else {
+                    continue;
+                }
+
+                String rest = rhs.substring(1);
+                if (!VN.contains(rest)) {
                     isRegular = false;
                 }
             }
         }
-
         if (isRegular) return "Type 3 (Regular Grammar)";
         return "Type 2 or lower (Context-Free or more general)";
     }
