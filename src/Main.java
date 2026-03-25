@@ -1,16 +1,31 @@
+import java.util.*;
+
 public class Main {
 
     public static void main(String[] args) {
 
-        String text = "sin(3 + 4.5) * cos(2)";
+        String r1 = "(a|b)(c|d)E+G?";
+        String r2 = "P(Q|R|S)T(UV|W|X)*Z+";
+        String r3 = "1(0|1)*2(3|4)^536";
 
-        Lexer lexer = new Lexer(text);
+        runRegex(r1);
+        runRegex(r2);
+        runRegex(r3);
+    }
 
-        Token token = lexer.getNextToken();
+    public static void runRegex(String regex) {
 
-        while (token.type != TokenType.EOF) {
-            System.out.println(token);
-            token = lexer.getNextToken();
-        }
+        System.out.println("\nRegex: " + regex);
+
+        RegexParser parser = new RegexParser(regex);
+        List<Block> blocks = parser.parse();
+
+        // BONUS
+        parser.explain(blocks);
+
+        List<String> result = Generator.generate(blocks);
+
+        System.out.println("Generated:");
+        result.stream().limit(20).forEach(System.out::println);
     }
 }

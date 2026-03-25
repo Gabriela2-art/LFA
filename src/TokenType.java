@@ -1,18 +1,12 @@
 public enum TokenType {
-
-    INTEGER,
-    FLOAT,
-
-    PLUS,
-    MINUS,
-    MULTIPLY,
-    DIVIDE,
-
-    SIN,
-    COS,
-
+    CHAR,
     LPAREN,
     RPAREN,
-
+    OR,
+    STAR,
+    PLUS,
+    QUESTION,
+    POWER,
+    NUMBER,
     EOF
 }
