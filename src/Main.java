@@ -19,8 +19,6 @@ public class Main {
 
         RegexParser parser = new RegexParser(regex);
         List<Block> blocks = parser.parse();
-
-        // BONUS
         parser.explain(blocks);
 
         List<String> result = Generator.generate(blocks);
