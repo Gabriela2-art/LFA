@@ -1,29 +1,29 @@
 import java.util.*;
 
 public class Main {
-
     public static void main(String[] args) {
+        Set<String> VN = new HashSet<>(Arrays.asList("S", "A", "B", "C", "D", "E"));
+        Set<String> VT = new HashSet<>(Arrays.asList("a", "b"));
+        Grammar g = new Grammar(VN, VT, "S");
 
-        String r1 = "(a|b)(c|d)E+G?";
-        String r2 = "P(Q|R|S)T(UV|W|X)*Z+";
-        String r3 = "1(0|1)*2(3|4)^536";
+        g.addProduction("S", "aB");
+        g.addProduction("S", "AC");
+        g.addProduction("A", "a");
+        g.addProduction("A", "ASC");
+        g.addProduction("A", "BC");
+        g.addProduction("A", "aD");
+        g.addProduction("B", "b");
+        g.addProduction("B", "bS");
+        g.addProduction("C", "ε");
+        g.addProduction("C", "BA");
+        g.addProduction("E", "aB");
+        g.addProduction("D", "abc");
 
-        runRegex(r1);
-        runRegex(r2);
-        runRegex(r3);
-    }
+        g.printGrammar("\nInitial Grammar:");
 
-    public static void runRegex(String regex) {
+        CNFConverter converter = new CNFConverter();
+        converter.convert(g);
 
-        System.out.println("\nRegex: " + regex);
-
-        RegexParser parser = new RegexParser(regex);
-        List<Block> blocks = parser.parse();
-        parser.explain(blocks);
-
-        List<String> result = Generator.generate(blocks);
-
-        System.out.println("Generated:");
-        result.stream().limit(20).forEach(System.out::println);
+        g.printGrammar("\nFinal Normalized Grammar (CNF):");
     }
 }
