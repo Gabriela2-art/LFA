@@ -123,213 +123,307 @@ public class Production {
 
 ### CNFConverter class
 
-This is the core class that performs the transformation into CNF. The conversion is done step-by-step inside a single method.
-The converter also prints the grammar after each transformation step, allowing full traceability of the CNF conversion process.
+This is the core class that performs the transformation into CNF. The conversion is done step-by-step inside a single method.  
+The converter prints the grammar after each transformation step (Step 0 to Step 5), allowing full traceability of the CNF conversion process.
 
 Example: main conversion pipeline
 
 ```java
 public void convert(Grammar g) {
+
+    g.printGrammar("\nStep 0: Initial Grammar");
+
     eliminateEpsilon(g);
+    g.printGrammar("\nStep 1: After ε-elimination");
+
     eliminateUnitProductions(g);
+    g.printGrammar("\nStep 2: After Unit elimination");
+
     eliminateNonProductive(g);
+    g.printGrammar("\nStep 3: After Non-productive removal");
+
     eliminateInaccessible(g);
+    g.printGrammar("\nStep 4: After Inaccessible removal");
+
     replaceTerminals(g);
     splitLongRules(g);
-    eliminateUnitProductions(g); // final cleanup
 
     g.P = new ArrayList<>(new LinkedHashSet<>(g.P));
+    g.printGrammar("\nStep 5: Chomsky Normal Form");
 }
 ```
-1. Eliminate epsilon productions
 
+The conversion process is executed step by step, and the grammar is printed after each stage.
+Unlike simpler implementations, no final unit elimination step is required.
+
+
+1. Eliminate epsilon productions
 ```java
 private void eliminateEpsilon(Grammar g) {
-        Set<String> nullable = new HashSet<>();
+    Set<String> nullable = new HashSet<>();
 
-        for (Production p : g.P) {
-            if (p.getRightSide().equals("ε")) {
-                nullable.add(p.getLeftSide());
-            }
+    for (Production p : g.P) {
+        if (p.getRightSide().equals("ε")) {
+            nullable.add(p.getLeftSide());
         }
-
-        List<Production> newP = new ArrayList<>();
-
-        for (Production p : g.P) {
-            if (p.getRightSide().equals("ε")) continue;
-
-            String rhs = p.getRightSide();
-            List<String> results = generateCombinations(rhs, nullable);
-
-            for (String r : results) {
-                if (!r.isEmpty() && !r.equals("ε")) {
-                    newP.add(new Production(p.getLeftSide(), r));
-                }
-            }
-        }
-
-        g.P = newP;
     }
-```
-2. Eliminate unit productions
 
+    Set<Production> newP = new LinkedHashSet<>();
+
+    for (Production p : g.P) {
+        if (p.getRightSide().equals("ε")) continue;
+
+        List<String> symbols = splitSymbols(p.getRightSide());
+        List<List<String>> combos = generate(symbols, nullable);
+
+        for (List<String> c : combos) {
+            if (!c.isEmpty()) {
+                newP.add(new Production(p.getLeftSide(), String.join("", c)));
+            }
+        }
+    }
+
+    g.P = new ArrayList<>(newP);
+}
+```
+
+2. Eliminate unit productions
 ```java
 private void eliminateUnitProductions(Grammar g) {
-        boolean changed = true;
 
-        while (changed) {
-            changed = false;
+    Map<String, Set<String>> unitGraph = new HashMap<>();
 
-            List<Production> units = g.P.stream()
-                    .filter(p -> p.getRightSide().length() == 1 && g.VN.contains(p.getRightSide()))
-                    .collect(Collectors.toList());
-
-            for (Production u : units) {
-                g.P.remove(u);
-
-                for (Production p : new ArrayList<>(g.P)) {
-                    if (p.getLeftSide().equals(u.getRightSide())) {
-                        Production np = new Production(u.getLeftSide(), p.getRightSide());
-                        if (!g.P.contains(np)) {
-                            g.P.add(np);
-                            changed = true;
-                        }
-                    }
-                }
-            }
-        }
+    for (String v : g.VN) {
+        unitGraph.put(v, new HashSet<>());
+        unitGraph.get(v).add(v);
     }
-```
-3. Remove non-productive symbols
 
-```java
-private void eliminateNonProductive(Grammar g) {
-        Set<String> productive = new HashSet<>();
+    boolean changed = true;
 
-        boolean changed = true;
-        while (changed) {
-            changed = false;
+    while (changed) {
+        changed = false;
 
-            for (Production p : g.P) {
-                boolean ok = true;
+        for (Production p : g.P) {
+            List<String> rhs = splitSymbols(p.getRightSide());
 
-                for (char c : p.getRightSide().toCharArray()) {
-                    String s = String.valueOf(c);
-                    if (!g.VT.contains(s) && !productive.contains(s)) {
-                        ok = false;
-                        break;
-                    }
-                }
+            if (rhs.size() == 1 && g.VN.contains(rhs.get(0))) {
+                String A = p.getLeftSide();
+                String B = rhs.get(0);
 
-                if (ok && productive.add(p.getLeftSide())) {
+                if (unitGraph.get(A).addAll(unitGraph.get(B))) {
                     changed = true;
                 }
             }
         }
-
-        g.P.removeIf(p -> !productive.contains(p.getLeftSide()));
     }
-```
-4. Remove inaccessible symbols
 
-```java
-private void eliminateInaccessible(Grammar g) {
-        Set<String> reach = new HashSet<>();
-        reach.add(g.S);
+    Set<Production> newP = new LinkedHashSet<>();
 
-        boolean changed = true;
-
-        while (changed) {
-            changed = false;
-
+    for (String A : g.VN) {
+        for (String B : unitGraph.get(A)) {
             for (Production p : g.P) {
-                if (reach.contains(p.getLeftSide())) {
-                    for (char c : p.getRightSide().toCharArray()) {
-                        String s = String.valueOf(c);
-                        if (g.VN.contains(s) && reach.add(s)) {
-                            changed = true;
-                        }
+                List<String> rhs = splitSymbols(p.getRightSide());
+
+                if (p.getLeftSide().equals(B)) {
+                    if (!(rhs.size() == 1 && g.VN.contains(rhs.get(0)))) {
+                        newP.add(new Production(A, p.getRightSide()));
                     }
                 }
             }
         }
-
-        g.P.removeIf(p -> !reach.contains(p.getLeftSide()));
     }
+
+    g.P = new ArrayList<>(newP);
+}
+```
+
+3. Remove non-productive symbols
+```java
+private void eliminateNonProductive(Grammar g) {
+    Set<String> productive = new HashSet<>();
+
+    boolean changed = true;
+    while (changed) {
+        changed = false;
+
+        for (Production p : g.P) {
+            List<String> rhs = splitSymbols(p.getRightSide());
+
+            boolean ok = true;
+            for (String s : rhs) {
+                if (!g.VT.contains(s) && !productive.contains(s)) {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if (ok && productive.add(p.getLeftSide())) {
+                changed = true;
+            }
+        }
+    }
+
+    g.P.removeIf(p -> !productive.contains(p.getLeftSide()));
+}
+```
+
+4. Remove inaccessible symbols
+```java
+private void eliminateInaccessible(Grammar g) {
+    Set<String> reach = new HashSet<>();
+    reach.add(g.S);
+
+    boolean changed = true;
+
+    while (changed) {
+        changed = false;
+
+        for (Production p : g.P) {
+            if (reach.contains(p.getLeftSide())) {
+                for (String s : splitSymbols(p.getRightSide())) {
+                    if (g.VN.contains(s) && reach.add(s)) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    g.P.removeIf(p -> !reach.contains(p.getLeftSide()));
+}
 ```
 
 5. Replace terminals in long productions
-
 ```java
 private void replaceTerminals(Grammar g) {
-        Map<String, String> map = new HashMap<>();
-        List<Production> newP = new ArrayList<>();
+    List<Production> newP = new ArrayList<>();
 
-        for (Production p : g.P) {
-            String rhs = p.getRightSide();
+    for (Production p : g.P) {
+        List<String> rhs = splitSymbols(p.getRightSide());
 
-            if (rhs.length() > 1) {
-                StringBuilder sb = new StringBuilder();
+        if (rhs.size() > 1) {
+            List<String> newRhs = new ArrayList<>();
 
-                for (char c : rhs.toCharArray()) {
-                    String s = String.valueOf(c);
+            for (String s : rhs) {
+                if (g.VT.contains(s)) {
 
-                    if (g.VT.contains(s)) {
-                        String nt = "T" + s.toUpperCase(); // TA, TB
-                        map.put(nt, s);
-                        sb.append(nt);
-                    } else {
-                        sb.append(s);
+                    String var = terminalMap.get(s);
+
+                    if (var == null) {
+                        var = "Y" + varCount++;
+                        terminalMap.put(s, var);
+                        g.VN.add(var);
+
+                        newP.add(new Production(var, s));
                     }
+
+                    newRhs.add(var);
+                } else {
+                    newRhs.add(s);
                 }
-
-                newP.add(new Production(p.getLeftSide(), sb.toString()));
-            } else {
-                newP.add(p);
             }
-        }
 
-        for (var e : map.entrySet()) {
-            g.VN.add(e.getKey());
-            newP.add(new Production(e.getKey(), e.getValue()));
+            newP.add(new Production(p.getLeftSide(), String.join("", newRhs)));
+        } else {
+            newP.add(p);
         }
-
-        g.P = newP;
     }
-```
 
-6. Split long productions into binary form
-
-```java
- private void splitLongRules(Grammar g) {
-        List<Production> res = new ArrayList<>();
-
-        for (Production p : g.P) {
-            String rhs = p.getRightSide();
-
-            if (rhs.length() <= 2) {
-                res.add(p);
-                continue;
-            }
-
-            String current = p.getLeftSide();
-
-            for (int i = 0; i < rhs.length() - 2; i++) {
-                String newVar = "X" + varCount++;
-                g.VN.add(newVar);
-
-                res.add(new Production(current, rhs.charAt(i) + newVar));
-                current = newVar;
-            }
-
-            res.add(new Production(current,
-                    "" + rhs.charAt(rhs.length() - 2) + rhs.charAt(rhs.length() - 1)));
-        }
-
-        g.P = res;
-    }
+    g.P = new ArrayList<>(new LinkedHashSet<>(newP));
 }
 ```
+
+Terminals appearing in productions with length greater than one are replaced using dynamically generated non-terminals (Y1, Y2, …).
+A mapping structure ensures that duplicates are not created.
+
+6. Split long productions into binary form
+```java
+private String getOrCreatePair(String pair, Grammar g, List<Production> newProductions) {
+    if (pairMap.containsKey(pair)) {
+        return pairMap.get(pair);
+    }
+
+    String var = "X" + varCount++;
+    pairMap.put(pair, var);
+    g.VN.add(var);
+
+    Production newP = new Production(var, pair);
+
+    if (!newProductions.contains(newP)) {
+        newProductions.add(newP);
+    }
+
+    return var;
+}
+
+private void splitLongRules(Grammar g) {
+    List<Production> newProductions = new ArrayList<>();
+
+    for (Production p : g.P) {
+        List<String> rhs = splitSymbols(p.getRightSide());
+
+        if (rhs.size() <= 2) {
+            newProductions.add(p);
+            continue;
+        }
+
+        List<String> symbols = new ArrayList<>(rhs);
+
+        while (symbols.size() > 2) {
+
+            String last = symbols.get(symbols.size() - 1);
+            String secondLast = symbols.get(symbols.size() - 2);
+
+            String pair = secondLast + last;
+            String newVar = getOrCreatePair(pair, g, newProductions);
+
+            symbols.remove(symbols.size() - 1);
+            symbols.remove(symbols.size() - 1);
+            symbols.add(newVar);
+        }
+
+        newProductions.add(
+            new Production(p.getLeftSide(), String.join("", symbols))
+        );
+    }
+
+    g.P = newProductions;
+}
+```
+
+Long productions are transformed into binary form while reusing existing pairs to avoid duplicates.
+
+7. Symbol parsing
+```java
+private List<String> splitSymbols(String rhs) {
+    List<String> symbols = new ArrayList<>();
+
+    for (int i = 0; i < rhs.length(); i++) {
+        char c = rhs.charAt(i);
+
+        if (Character.isUpperCase(c)) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(c);
+            i++;
+
+            while (i < rhs.length() && Character.isDigit(rhs.charAt(i))) {
+                sb.append(rhs.charAt(i));
+                i++;
+            }
+
+            i--;
+            symbols.add(sb.toString());
+        }
+        else {
+            symbols.add(String.valueOf(c));
+        }
+    }
+
+    return symbols;
+}
+```
+
+This method ensures correct handling of multi-character non-terminals such as X1 or Y2.
 
 ### Main class
 
@@ -355,24 +449,25 @@ It:
 
 ### Program Execution Output
 
-<img width="175" height="564" alt="image" src="https://github.com/user-attachments/assets/4c9ae0e5-ed09-4a4a-8c55-097db68d9b9e" /><img width="211" height="572" alt="image" src="https://github.com/user-attachments/assets/cc9034b7-7e1a-42b2-881a-f1ffe2332484" />
-<img width="210" height="577" alt="image" src="https://github.com/user-attachments/assets/96a28dc3-b11f-46eb-ae0c-52a2cdaf75dc" />
-<img width="179" height="575" alt="image" src="https://github.com/user-attachments/assets/2948f8e1-c218-46ce-8f52-3611da40a0d1" />
-<img width="90" height="249" alt="image" src="https://github.com/user-attachments/assets/9d960ef4-4458-4f11-85da-5eaf4df4e003" />
-<img width="145" height="462" alt="image" src="https://github.com/user-attachments/assets/13aaa274-c8fa-492f-962d-1fe24f2c3541" />
+<img width="186" height="383" alt="image" src="https://github.com/user-attachments/assets/38b60cf7-3256-4aba-9f68-34d20dbf82ab" />
+<img width="200" height="306" alt="image" src="https://github.com/user-attachments/assets/c6b46003-4476-4a34-8442-5faf5cac7cd2" />
+<img width="218" height="582" alt="image" src="https://github.com/user-attachments/assets/d7cb8c03-d9a6-42ef-b9d5-6fed2fcc50f1" />
+<img width="182" height="333" alt="image" src="https://github.com/user-attachments/assets/ca510de9-1fe8-4343-82a1-3d89a108bc3d" />
 
-This screenshots demonstrate the execution of the program for a given context-free grammar. The program prints the grammar after each transformation step (Step 0 to Step 7), allowing full traceability of the CNF conversion process.
+
+These screenshots demonstrate the execution of the program for a given context-free grammar. The program prints the grammar after each transformation step (Step 0 to Step 5), allowing full traceability of the CNF conversion process.
+
 
 The "Step 0: Initial Grammar" section contains the original set of production rules, including epsilon productions, unit productions, and longer rules that do not satisfy CNF constraints.
 
 Each subsequent step shows the intermediate transformations:
 - epsilon productions are removed by generating all valid combinations
-- unit productions are eliminated (both initially and in the final step)
+- unit productions are eliminated
 - non-productive and inaccessible symbols are removed
-- terminals in longer rules are replaced with new non-terminals (e.g., TA, TB)
-- long productions are split into binary form using auxiliary symbols (e.g., X1, X2)
+- terminals in longer rules are replaced with dynamically generated non-terminals (e.g., Y1, Y2)
+- long productions are split into binary form using auxiliary symbols (e.g., X1, X2), while avoiding duplicate variables
 
-The "FINAL CNF" section illustrates the result after applying all transformation steps.
+The "Step 5: Chomsky Normal Form" section illustrates the result after applying all transformation steps.
 
 The output confirms that all production rules now follow the CNF format:
 - A → BC
@@ -383,14 +478,13 @@ Duplicate productions are removed to ensure a clean and minimal grammar.
 Overall, the result validates that the implemented system successfully converts an arbitrary grammar into an equivalent CNF grammar while preserving the language.
 
 ## Conclusions
-
 In this laboratory work, a system for transforming context-free grammars into Chomsky Normal Form (CNF) was implemented in Java. Instead of working with grammars in their original, potentially complex form, the program systematically converts them into a simplified and standardized structure.
 
 The implementation supports all essential steps required for CNF conversion, including the elimination of epsilon productions, removal of unit productions, and filtering of non-productive and inaccessible symbols. Additionally, it handles the restructuring of productions by replacing terminals in longer rules and decomposing complex productions into binary form.
 
 The solution is organized into multiple stages, each corresponding to a specific transformation step. This modular approach improves code clarity and makes the implementation easier to understand, debug, and extend. Each stage preserves the language of the grammar while gradually enforcing the constraints of CNF.
 
-Auxiliary non-terminals (such as 𝑋𝑎, 𝑋𝑏, 𝑌1, 𝑌2) are introduced dynamically to ensure that all productions comply with CNF rules. Duplicate productions are also removed to maintain a clean and efficient grammar representation.
+Auxiliary non-terminals (such as X1, X2, Y1, Y2) are introduced dynamically to ensure that all productions comply with CNF rules. The implementation also avoids duplicate productions and redundant variables by using mapping structures and set-based filtering.
 
 The execution results confirm that the program correctly transforms an arbitrary grammar into an equivalent CNF grammar. The final output demonstrates that all productions follow the required forms A→BC or A→a, validating the correctness of the implementation.
 
