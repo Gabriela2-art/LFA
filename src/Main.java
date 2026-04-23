@@ -17,13 +17,10 @@ public class Main {
         g.addProduction("C", "ε");
         g.addProduction("C", "BA");
         g.addProduction("E", "aB");
-        g.addProduction("D", "abc");
-
-        g.printGrammar("\nInitial Grammar:");
+        g.addProduction("D", "abC");
 
         CNFConverter converter = new CNFConverter();
         converter.convert(g);
 
-        g.printGrammar("\nFinal Normalized Grammar (CNF):");
     }
 }
